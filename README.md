@@ -3,6 +3,12 @@
 Wonderdog is a Hadoop interface to Elastic Search. While it is specifically intended for use with Apache Pig, it does include all the necessary Hadoop input and output formats for Elastic Search. That is, it's possible to skip Pig en
 tirely and write custom Hadoop jobs if you prefer.
 
+# Changes from Main Branch
+* Upgraded Hadoop version to 2.0.0-cdh4.0.0 and modified imports accordingly.
+* Upgraded elasticsearch version 0.19.10.
+* Added dynamic mapping template creation ability.
+* Library jars are included in final target jar via maven dependency plugin.
+
 ## Requirements
 
 ## Usage
@@ -28,6 +34,66 @@ STORE ufo_sightings INTO 'es://$INDEX/$OBJ?json=false&size=1000' USING com.infoc
 ```
 
 Here the fields that you set in Pig (eg. 'sighted_at') are used as the field names when creating json records for elasticsearch.
+
+##### Using dynamic mapping
+To use dynamic mapping, simply change your field names to match the associated template matcher.
+This version puts the dynamic mapping below automatically to the index name and type used with ElasticSearchStorage.
+```{
+   "dynamic_templates": [
+       {
+           "template_bol": {
+               "mapping": {
+                   "type": "boolean"
+               },
+               "match": "*_bol"
+           }
+       },
+       {
+           "template_dbl": {
+               "mapping": {
+                   "type": "double"
+               },
+               "match": "*_dbl"
+           }
+       },
+       {
+           "template_float": {
+               "mapping": {
+                   "type": "float"
+               },
+               "match": "*_flt"
+           }
+       },
+       {
+           "template_int": {
+               "mapping": {
+                   "type": "integer"
+               },
+               "match": "*_int"
+           }
+       },
+       {
+           "template_str": {
+               "mapping": {
+                   "analyzer": {
+                       "keywordtype": "string"
+                   }
+               },
+               "match": "*_str"
+           }
+       },
+       {
+           "template_whitespace": {
+               "mapping": {
+                   "analyzer": {
+                       "whitespacetype": "string"
+                   }
+               },
+               "match": "*_wht"
+           }
+       }
+   ]
+}```
 
 #### Storing json data:
 

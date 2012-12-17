@@ -1,43 +1,26 @@
 package com.infochimps.elasticsearch;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.Random;
-import java.net.URI;
-
+import com.infochimps.elasticsearch.hadoop.util.HadoopUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.io.*;
-import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.hadoop.mapreduce.JobContext;
-import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapreduce.Counter;
-import org.apache.hadoop.mapreduce.OutputFormat;
-import org.apache.hadoop.mapreduce.OutputCommitter;
-import org.apache.hadoop.filecache.DistributedCache;
-
-import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.common.xcontent.XContentFactory;
-import org.elasticsearch.node.Node;
-import org.elasticsearch.node.NodeBuilder;
+import org.apache.hadoop.io.*;
+import org.apache.hadoop.mapreduce.*;
+import org.elasticsearch.ExceptionsHelper;
+import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.Requests;
-import org.elasticsearch.action.bulk.BulkRequestBuilder;
+import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.indices.IndexAlreadyExistsException;
-import org.elasticsearch.action.bulk.BulkResponse;
-import org.elasticsearch.ExceptionsHelper;
+import org.elasticsearch.node.Node;
+import org.elasticsearch.node.NodeBuilder;
 
-import com.infochimps.elasticsearch.hadoop.util.HadoopUtils;
+import java.io.IOException;
+import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
    
@@ -83,7 +66,7 @@ public class ElasticSearchOutputFormat extends OutputFormat<NullWritable, MapWri
         private static final String SLASH = "/";
         private static final String NO_ID_FIELD = "-1";
         
-        private volatile BulkRequestBuilder currentRequest;
+        private volatile org.elasticsearch.action.bulk.BulkRequestBuilder currentRequest;
 
         /**
            Instantiates a new RecordWriter for Elasticsearch
@@ -137,10 +120,73 @@ public class ElasticSearchOutputFormat extends OutputFormat<NullWritable, MapWri
             
             start_embedded_client();
             initialize_index(indexName);
+            putDynamicMapping();
             currentRequest = client.prepareBulk();
         }
+        
+        //determine type dynamically ???
+        private void putDynamicMapping() {
+            String DT_MAPPING = "{\n" +
+                    "    \"_default_\": {\n" +
+                    "        \"dynamic_templates\": [\n" +
+                    "            {\n" +
+                    "                \"template_bol\": {\n" +
+                    "                    \"match\": \"*_bol\",\n" +
+                    "                    \"mapping\": {\n" +
+                    "                        \"type\": \"boolean\"\n" +
+                    "                    }\n" +
+                    "                }\n" +
+                    "            },\n" +
+                    "            {\n" +
+                    "                \"template_dbl\": {\n" +
+                    "                    \"match\": \"*_dbl\",\n" +
+                    "                    \"mapping\": {\n" +
+                    "                        \"type\": \"double\"\n" +
+                    "                    }\n" +
+                    "                }\n" +
+                    "            },\n" +
+                    "            {\n" +
+                    "                \"template_float\": {\n" +
+                    "                    \"match\": \"*_flt\",\n" +
+                    "                    \"mapping\": {\n" +
+                    "                        \"type\": \"float\"\n" +
+                    "                    }\n" +
+                    "                }\n" +
+                    "            },\n" +
+                    "            {\n" +
+                    "                \"template_int\": {\n" +
+                    "                    \"match\": \"*_int\",\n" +
+                    "                    \"mapping\": {\n" +
+                    "                        \"type\": \"integer\"\n" +
+                    "                    }\n" +
+                    "                }\n" +
+                    "            },\n" +
+                    "            {\n" +
+                    "                \"template_str\": {\n" +
+                    "                    \"match\": \"*_str\",\n" +
+                    "                    \"mapping\": {\n" +
+                    "                        \"type\": \"string\",\n" +
+                    "                        \"analyzer\": \"keyword\"\n" +
+                    "                    }\n" +
+                    "                }\n" +
+                    "            },\n" +
+                    "            {\n" +
+                    "                \"template_whitespace\": {\n" +
+                    "                    \"match\": \"*_wht\",\n" +
+                    "                    \"mapping\": {\n" +
+                    "                        \"type\": \"string\",\n" +
+                    "                        \"analyzer\": \"whitespace\"\n" +
+                    "                    }\n" +
+                    "                }\n" +
+                    "            }\n" +
+                    "        ]\n" +
+                    "    }\n" +
+                    "}";
 
-        /**
+            client.admin().indices().preparePutMapping(indexName).setType(objType).setSource(DT_MAPPING).execute().actionGet();
+		}
+
+		/**
            Closes the connection to elasticsearch. Any documents remaining in the bulkRequest object are indexed.
          */
         public void close(TaskAttemptContext context) throws IOException {
@@ -177,7 +223,7 @@ public class ElasticSearchOutputFormat extends OutputFormat<NullWritable, MapWri
                     String record_id = fields.get(mapKey).toString();
                     currentRequest.add(Requests.indexRequest(indexName).id(record_id).type(objType).create(false).source(builder));                    
                 } catch (Exception e) {
-                    LOG.warn("Encountered malformed record");
+                    LOG.warn("Encountered malformed record", e);
                 }
             }
             processBulkIfNeeded();
