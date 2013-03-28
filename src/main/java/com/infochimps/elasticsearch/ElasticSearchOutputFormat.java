@@ -178,6 +178,14 @@ public class ElasticSearchOutputFormat extends OutputFormat<NullWritable, MapWri
                     "                        \"analyzer\": \"whitespace\"\n" +
                     "                    }\n" +
                     "                }\n" +
+                    "            },\n" +
+                    "            {\n" +
+                    "                \"template_lng\": {\n" +
+                    "                    \"match\": \"*_lng\",\n" +
+                    "                    \"mapping\": {\n" +
+                    "                        \"type\": \"long\"\n" +
+                    "                    }\n" +
+                    "                }\n" +
                     "            }\n" +
                     "        ]\n" +
                     "    }\n" +
