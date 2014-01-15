@@ -352,4 +352,9 @@ public class ElasticSearchStorage extends LoadFunc implements StoreFuncInterface
     @Override
     public void cleanupOnFailure(String location, Job job) throws IOException {
     }
+
+    @Override
+    public void cleanupOnSuccess(String location, Job job) throws IOException {
+
+    }
 }
